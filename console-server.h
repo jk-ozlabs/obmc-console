@@ -72,11 +72,11 @@ enum poller_ret {
 	POLLER_EXIT,
 };
 
-typedef enum poller_ret (*poller_fn_t)(struct handler *handler,
+typedef enum poller_ret (*poller_event_fn_t)(struct handler *handler,
 					int revents, void *data);
 
 struct poller *console_poller_register(struct console *console,
-		struct handler *handler, poller_fn_t poller_fn,
+		struct handler *handler, poller_event_fn_t event_fn,
 		int fd, int events, void *data);
 
 void console_poller_unregister(struct console *console, struct poller *poller);

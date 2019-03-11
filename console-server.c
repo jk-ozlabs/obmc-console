@@ -64,10 +64,10 @@ struct console {
 };
 
 struct poller {
-	struct handler	*handler;
-	void		*data;
-	poller_fn_t	fn;
-	bool		remove;
+	struct handler		*handler;
+	void			*data;
+	poller_event_fn_t	event_fn;
+	bool			remove;
 };
 
 /* we have two extra entry in the pollfds array for the VUART tty */
@@ -464,7 +464,7 @@ struct ringbuffer_consumer *console_ringbuffer_consumer_register(
 }
 
 struct poller *console_poller_register(struct console *console,
-		struct handler *handler, poller_fn_t poller_fn,
+		struct handler *handler, poller_event_fn_t event_fn,
 		int fd, int events, void *data)
 {
 	struct poller *poller;
@@ -473,7 +473,7 @@ struct poller *console_poller_register(struct console *console,
 	poller = malloc(sizeof(*poller));
 	poller->remove = false;
 	poller->handler = handler;
-	poller->fn = poller_fn;
+	poller->event_fn = event_fn;
 	poller->data = data;
 
 	/* add one to our pollers array */
@@ -567,7 +567,7 @@ static int call_pollers(struct console *console)
 		if (!pollfd->revents)
 			continue;
 
-		prc = poller->fn(poller->handler, pollfd->revents,
+		prc = poller->event_fn(poller->handler, pollfd->revents,
 				poller->data);
 		if (prc == POLLER_EXIT)
 			rc = -1;
