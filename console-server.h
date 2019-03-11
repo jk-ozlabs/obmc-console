@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef _CONSOLE_SERVER_H
+#define _CONSOLE_SERVER_H
 
 #include <poll.h>
 #include <stdbool.h>
@@ -145,3 +147,5 @@ int write_buf_to_fd(int fd, const uint8_t *buf, size_t len);
 	do { \
 		char __c[(c)?1:-1] __attribute__((unused)); \
 	} while (0)
+
+#endif /* _CONSOLE_SERVER_H */
