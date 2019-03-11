@@ -248,7 +248,7 @@ static enum poller_ret socket_poll(struct handler *handler,
 	client->sh = sh;
 	client->fd = fd;
 	client->poller = console_poller_register(sh->console, handler,
-			client_poll, client->fd, POLLIN, client);
+			client_poll, NULL, client->fd, POLLIN, client);
 	client->rbc = console_ringbuffer_consumer_register(sh->console,
 			client_ringbuffer_poll, client);
 
@@ -297,7 +297,7 @@ static int socket_init(struct handler *handler, struct console *console,
 	}
 
 	sh->poller = console_poller_register(console, handler, socket_poll,
-			sh->sd, POLLIN, NULL);
+			NULL, sh->sd, POLLIN, NULL);
 
 	return 0;
 }
