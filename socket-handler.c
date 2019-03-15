@@ -38,6 +38,7 @@ struct client {
 	struct ringbuffer_consumer	*rbc;
 	int				fd;
 	bool				blocked;
+	bool				timer_pending;
 };
 
 struct socket_handler {
@@ -48,6 +49,11 @@ struct socket_handler {
 
 	struct client		**clients;
 	int			n_clients;
+};
+
+static const struct timeval batch_timeout = {
+	.tv_sec = 0,
+	.tv_usec = 2000,
 };
 
 static struct socket_handler *to_socket_handler(struct handler *handler)
@@ -181,14 +187,49 @@ static enum ringbuffer_poll_ret client_ringbuffer_poll(void *arg,
 	struct client *client = arg;
 	int rc;
 
-	rc = client_drain_queue(client, force_len);
-	if (rc) {
-		client->rbc = NULL;
-		client_close(client);
-		return RINGBUFFER_POLL_REMOVE;
+	if (!client->timer_pending && !force_len) {
+		/* if we're not trying to clear out the ring buffer
+		 * immediately, (ie, !force_len), then defer the actual
+		 * send, to allow batching */
+
+		console_poller_set_timeout(client->sh->console,
+				client->poller, &batch_timeout);
+
+		client->timer_pending = true;
+
+	} else if (force_len) {
+
+		rc = client_drain_queue(client, force_len);
+		if (rc) {
+			client->rbc = NULL;
+			client_close(client);
+			return RINGBUFFER_POLL_REMOVE;
+		}
 	}
 
 	return RINGBUFFER_POLL_OK;
+}
+
+static enum poller_ret client_timeout(struct handler *handler, void *data)
+{
+	struct client *client = data;
+	int rc = 0;
+
+	client->timer_pending = false;
+
+	if (client->blocked) {
+		/* nothing to do here, we'll call client_drain_queue when
+		 * we become unblocked */
+		return POLLER_OK;
+	}
+
+	rc = client_drain_queue(client, 0);
+	if (rc) {
+		client_close(client);
+		return POLLER_REMOVE;
+	}
+
+	return POLLER_OK;
 }
 
 static enum poller_ret client_poll(struct handler *handler,
@@ -248,7 +289,8 @@ static enum poller_ret socket_poll(struct handler *handler,
 	client->sh = sh;
 	client->fd = fd;
 	client->poller = console_poller_register(sh->console, handler,
-			client_poll, NULL, client->fd, POLLIN, client);
+			client_poll, client_timeout, client->fd,
+			POLLIN, client);
 	client->rbc = console_ringbuffer_consumer_register(sh->console,
 			client_ringbuffer_poll, client);
 
